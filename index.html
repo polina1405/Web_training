@@ -1,0 +1,1433 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CSS Псевдоклассы — Пиксельный Тренажёр</title>
+<style>
+/* ============================================================
+   CSS VARIABLES & RESET
+   ============================================================ */
+:root {
+  --bg:          #0a0a1a;
+  --bg2:         #111128;
+  --panel:       #1a1a3a;
+  --panel2:      #222248;
+  --border:      #3a3a7a;
+  --border2:     #5555aa;
+  --text:        #e8e8ff;
+  --text2:       #9999cc;
+  --accent:      #ffdd00;
+  --accent2:     #ff8800;
+  --green:       #00ff88;
+  --red:         #ff4466;
+  --blue:        #44aaff;
+  --purple:      #aa44ff;
+  --pixel:       'Courier New', Courier, monospace;
+  --shadow:      4px 4px 0 #000;
+  --shadow-sm:   2px 2px 0 #000;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: var(--pixel);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  overflow-x: hidden;
+  image-rendering: pixelated;
+}
+
+/* Pixel scanline overlay */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0,0,0,0.08) 2px,
+    rgba(0,0,0,0.08) 4px
+  );
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* ============================================================
+   SCROLLBAR
+   ============================================================ */
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border2); border: 2px solid var(--bg); }
+
+/* ============================================================
+   PIXEL FONT HELPERS
+   ============================================================ */
+.px-title {
+  font-size: clamp(18px, 3vw, 28px);
+  text-transform: uppercase;
+  letter-spacing: 3px;
+  color: var(--accent);
+  text-shadow: var(--shadow);
+}
+.px-sub {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: var(--text2);
+}
+
+/* ============================================================
+   SCREEN MANAGEMENT
+   ============================================================ */
+.screen { display: none; }
+.screen.active { display: block; }
+
+/* ============================================================
+   HEADER
+   ============================================================ */
+#header {
+  background: var(--panel);
+  border-bottom: 3px solid var(--border);
+  padding: 10px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 4px 0 #000;
+}
+
+.header-logo {
+  font-size: 14px;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  text-shadow: 2px 2px 0 #000;
+}
+.header-logo span { color: var(--blue); }
+
+#header-lives {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.heart {
+  font-size: 16px;
+  filter: drop-shadow(1px 1px 0 #000);
+  transition: transform 0.2s;
+}
+.heart.lost { opacity: 0.25; }
+
+#score-display {
+  font-size: 12px;
+  color: var(--accent);
+  text-shadow: var(--shadow-sm);
+  text-align: right;
+}
+
+/* ============================================================
+   MAP SCREEN
+   ============================================================ */
+#map-screen {
+  padding: 30px 20px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.map-title {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.map-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 16px;
+  margin-bottom: 40px;
+}
+
+.map-node {
+  background: var(--panel);
+  border: 3px solid var(--border);
+  padding: 16px 12px;
+  text-align: center;
+  cursor: pointer;
+  transition: transform 0.1s, border-color 0.2s, box-shadow 0.2s;
+  box-shadow: var(--shadow);
+  position: relative;
+  user-select: none;
+}
+.map-node:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 6px 6px 0 #000;
+  border-color: var(--accent);
+}
+.map-node:active { transform: translate(1px, 1px); box-shadow: 2px 2px 0 #000; }
+
+.map-node.locked {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+.map-node.completed {
+  border-color: var(--green);
+  background: #0a2a1a;
+}
+.map-node.completed::after {
+  content: '✓';
+  position: absolute;
+  top: 4px; right: 6px;
+  color: var(--green);
+  font-size: 12px;
+  font-weight: bold;
+}
+.map-node.current {
+  border-color: var(--accent);
+  animation: blink-border 1s step-end infinite;
+}
+
+@keyframes blink-border {
+  0%, 100% { border-color: var(--accent); }
+  50% { border-color: var(--border); }
+}
+
+.node-icon { font-size: 28px; margin-bottom: 8px; }
+.node-name {
+  font-size: 10px;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.node-stars { font-size: 12px; margin-top: 6px; color: #555; }
+.node-stars .earned { color: var(--accent); }
+
+.map-path {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 20px;
+  color: var(--border);
+  letter-spacing: 6px;
+}
+
+/* progress bar */
+.progress-bar-wrap {
+  background: var(--panel);
+  border: 2px solid var(--border);
+  height: 18px;
+  margin: 20px 0;
+  box-shadow: var(--shadow-sm);
+}
+.progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--green), var(--accent));
+  transition: width 0.5s ease;
+  position: relative;
+}
+.progress-bar-fill::after {
+  content: '';
+  position: absolute;
+  right: 0; top: 0;
+  width: 6px; height: 100%;
+  background: rgba(255,255,255,0.5);
+  animation: shine 1s linear infinite;
+}
+@keyframes shine { 0%,100%{opacity:1} 50%{opacity:0} }
+
+/* ============================================================
+   LESSON SCREEN
+   ============================================================ */
+#lesson-screen {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 20px;
+  display: none; /* overridden by .active */
+}
+#lesson-screen.active { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+
+@media (max-width: 760px) {
+  #lesson-screen.active { grid-template-columns: 1fr; }
+}
+
+/* Panel cards */
+.panel-card {
+  background: var(--panel);
+  border: 3px solid var(--border);
+  padding: 20px;
+  box-shadow: var(--shadow);
+}
+.panel-card h3 {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: var(--text2);
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--border);
+}
+
+/* Theory section */
+.theory-selector {
+  font-size: 10px;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  margin-bottom: 8px;
+}
+.theory-body {
+  font-size: 12px;
+  line-height: 1.8;
+  color: var(--text);
+}
+.theory-body code {
+  background: #0a0a2a;
+  color: var(--accent);
+  padding: 1px 5px;
+  border: 1px solid var(--border);
+  font-family: var(--pixel);
+  font-size: 11px;
+}
+.theory-body .example-box {
+  background: #0a0a2a;
+  border: 2px solid var(--border);
+  padding: 10px;
+  margin: 10px 0;
+  font-size: 11px;
+}
+.theory-body .example-box pre { color: var(--blue); white-space: pre-wrap; }
+
+/* Task description */
+.task-desc {
+  font-size: 12px;
+  line-height: 1.7;
+  margin-bottom: 14px;
+  color: var(--text);
+}
+.task-badge {
+  display: inline-block;
+  background: var(--accent2);
+  color: #000;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding: 2px 7px;
+  margin-bottom: 8px;
+  box-shadow: var(--shadow-sm);
+}
+
+/* Preview area */
+#preview-container {
+  background: #fff;
+  border: 3px solid var(--border);
+  min-height: 140px;
+  padding: 16px;
+  box-shadow: var(--shadow);
+  position: relative;
+}
+#preview-container iframe {
+  width: 100%; border: none; display: block;
+  min-height: 130px;
+}
+
+/* CSS Editor */
+.editor-wrap {
+  position: relative;
+}
+#css-input {
+  width: 100%;
+  min-height: 140px;
+  background: #0a0a2a;
+  color: var(--green);
+  border: 2px solid var(--border);
+  padding: 12px;
+  font-family: var(--pixel);
+  font-size: 12px;
+  resize: vertical;
+  outline: none;
+  line-height: 1.6;
+  caret-color: var(--accent);
+}
+#css-input:focus { border-color: var(--accent); }
+.editor-label {
+  font-size: 9px;
+  color: var(--text2);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  margin-bottom: 4px;
+}
+
+/* Hint box */
+#hint-box {
+  display: none;
+  background: #1a1000;
+  border: 2px solid var(--accent2);
+  padding: 10px 12px;
+  font-size: 11px;
+  color: var(--accent);
+  margin-top: 10px;
+  box-shadow: var(--shadow-sm);
+}
+#hint-box.visible { display: block; }
+
+/* Feedback box */
+#feedback-box {
+  margin-top: 10px;
+  padding: 10px 14px;
+  font-size: 12px;
+  border: 2px solid transparent;
+  display: none;
+  box-shadow: var(--shadow-sm);
+}
+#feedback-box.visible { display: block; }
+#feedback-box.success {
+  background: #002a14;
+  border-color: var(--green);
+  color: var(--green);
+}
+#feedback-box.error {
+  background: #2a0010;
+  border-color: var(--red);
+  color: var(--red);
+}
+
+/* Buttons */
+.btn-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+
+.btn {
+  padding: 9px 16px;
+  font-family: var(--pixel);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  cursor: pointer;
+  border: 2px solid;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.08s, box-shadow 0.08s;
+  user-select: none;
+}
+.btn:active { transform: translate(2px, 2px); box-shadow: none; }
+
+.btn-check  { background: var(--green);  color: #000; border-color: #008844; }
+.btn-next   { background: var(--accent); color: #000; border-color: #aa8800; display: none; }
+.btn-hint   { background: var(--panel2); color: var(--accent2); border-color: var(--accent2); }
+.btn-map    { background: var(--panel2); color: var(--text2); border-color: var(--border); }
+.btn-share  { background: #1a0a2a; color: var(--purple); border-color: var(--purple); }
+.btn-dl     { background: #0a1a2a; color: var(--blue); border-color: var(--blue); }
+
+.btn:hover { filter: brightness(1.15); }
+
+/* ============================================================
+   LEVEL COMPLETE OVERLAY
+   ============================================================ */
+#level-complete {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.85);
+  z-index: 500;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  text-align: center;
+}
+#level-complete.visible { display: flex; }
+
+.complete-card {
+  background: var(--panel);
+  border: 4px solid var(--accent);
+  padding: 40px 50px;
+  box-shadow: 8px 8px 0 #000;
+  animation: pop-in 0.3s ease;
+}
+@keyframes pop-in {
+  from { transform: scale(0.5); opacity: 0; }
+  to   { transform: scale(1);   opacity: 1; }
+}
+.complete-title { font-size: 22px; color: var(--accent); text-shadow: var(--shadow); }
+.complete-stars { font-size: 36px; margin: 16px 0; }
+.complete-score { font-size: 13px; color: var(--text2); margin-bottom: 20px; }
+
+/* ============================================================
+   GAME OVER OVERLAY
+   ============================================================ */
+#game-over {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.9);
+  z-index: 500;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+}
+#game-over.visible { display: flex; }
+.game-over-card {
+  background: var(--panel);
+  border: 4px solid var(--red);
+  padding: 40px 50px;
+  text-align: center;
+  box-shadow: 8px 8px 0 #000;
+  animation: shake 0.5s ease;
+}
+@keyframes shake {
+  0%,100%{transform:translateX(0)}
+  20%{transform:translateX(-10px)}
+  40%{transform:translateX(10px)}
+  60%{transform:translateX(-8px)}
+  80%{transform:translateX(8px)}
+}
+
+/* ============================================================
+   SHARE MODAL
+   ============================================================ */
+#share-modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.85);
+  z-index: 600;
+  align-items: center;
+  justify-content: center;
+}
+#share-modal.visible { display: flex; }
+.share-card {
+  background: var(--panel);
+  border: 3px solid var(--purple);
+  padding: 30px;
+  max-width: 480px;
+  width: 90%;
+  box-shadow: 8px 8px 0 #000;
+}
+.share-card h2 { color: var(--purple); margin-bottom: 16px; font-size: 14px; letter-spacing: 2px; }
+.share-url-box {
+  background: #0a0a2a;
+  border: 2px solid var(--border);
+  padding: 10px;
+  font-size: 10px;
+  color: var(--blue);
+  word-break: break-all;
+  margin: 12px 0;
+  min-height: 40px;
+}
+.share-instructions {
+  font-size: 10px;
+  line-height: 2;
+  color: var(--text2);
+  border-top: 2px solid var(--border);
+  margin-top: 16px;
+  padding-top: 12px;
+}
+.share-instructions ol { padding-left: 16px; }
+.share-instructions li { margin: 4px 0; }
+.step-badge {
+  display: inline-block;
+  background: var(--purple);
+  color: #000;
+  width: 16px; height: 16px;
+  text-align: center;
+  font-size: 9px;
+  line-height: 16px;
+  margin-right: 4px;
+}
+
+/* ============================================================
+   PIXEL DECORATIONS
+   ============================================================ */
+.pixel-sprite {
+  display: inline-block;
+  image-rendering: pixelated;
+  font-size: 24px;
+  line-height: 1;
+}
+
+/* stars animation */
+@keyframes star-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+.spinning { animation: star-spin 1s linear infinite; }
+
+/* coin collect */
+@keyframes coin-up {
+  0%   { transform: translateY(0); opacity: 1; }
+  100% { transform: translateY(-60px); opacity: 0; }
+}
+.coin-fx {
+  position: fixed;
+  font-size: 20px;
+  pointer-events: none;
+  animation: coin-up 0.8s ease forwards;
+  z-index: 1000;
+}
+
+/* ============================================================
+   LIVE PREVIEW LABEL
+   ============================================================ */
+.preview-label {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: var(--text2);
+  margin-bottom: 6px;
+}
+
+/* ============================================================
+   FOOTER
+   ============================================================ */
+#app-footer {
+  text-align: center;
+  padding: 20px;
+  font-size: 9px;
+  color: var(--border);
+  letter-spacing: 2px;
+  border-top: 2px solid var(--panel);
+  margin-top: 30px;
+}
+
+/* ============================================================
+   UTILITY
+   ============================================================ */
+.hidden { display: none !important; }
+.mt8  { margin-top: 8px; }
+.mb8  { margin-bottom: 8px; }
+</style>
+</head>
+<body>
+
+<!-- ============================================================
+     UI LAYER — Header
+     ============================================================ -->
+<div id="header">
+  <div class="header-logo">CSS<span>Quest</span></div>
+  <div id="header-lives">
+    <span class="heart" id="h1">❤️</span>
+    <span class="heart" id="h2">❤️</span>
+    <span class="heart" id="h3">❤️</span>
+  </div>
+  <div id="score-display">
+    SCORE: <span id="score-val">0</span><br>
+    <span class="px-sub">LEVEL <span id="level-num">1</span>/6</span>
+  </div>
+</div>
+
+<!-- ============================================================
+     UI LAYER — MAP SCREEN
+     ============================================================ -->
+<div id="map-screen" class="screen active">
+  <div class="map-title">
+    <div class="px-title">🗺️ Карта Уровней</div>
+    <div class="px-sub" style="margin-top:8px">Выбери уровень и освой CSS псевдоклассы</div>
+  </div>
+
+  <!-- Progress bar -->
+  <div style="margin-bottom:6px;" class="px-sub">Прогресс: <span id="prog-text">0/6</span></div>
+  <div class="progress-bar-wrap">
+    <div class="progress-bar-fill" id="prog-fill" style="width:0%"></div>
+  </div>
+
+  <!-- Level nodes -->
+  <div class="map-grid" id="map-nodes">
+    <!-- Generated by JS -->
+  </div>
+
+  <!-- Share / Download buttons -->
+  <div class="btn-row" style="justify-content:center; margin-top:10px;">
+    <button class="btn btn-share" onclick="openShareModal()">📤 Поделиться тренажёром</button>
+    <button class="btn btn-dl"    onclick="downloadHTML()">💾 Скачать HTML</button>
+  </div>
+</div>
+
+<!-- ============================================================
+     UI LAYER — LESSON SCREEN
+     ============================================================ -->
+<div id="lesson-screen" class="screen">
+
+  <!-- LEFT COLUMN: Theory + Preview -->
+  <div>
+    <div class="panel-card" id="theory-panel">
+      <h3>📖 Теория</h3>
+      <div class="theory-selector" id="theory-selector"></div>
+      <div class="theory-body" id="theory-body"></div>
+    </div>
+
+    <div class="panel-card" style="margin-top:16px;">
+      <h3>👁️ Предпросмотр</h3>
+      <div class="preview-label">Результат твоего CSS в реальном времени</div>
+      <div id="preview-container">
+        <iframe id="preview-frame" sandbox="allow-same-origin"></iframe>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT COLUMN: Task + Editor -->
+  <div>
+    <div class="panel-card">
+      <h3>🎯 Задание</h3>
+      <div class="task-badge">Уровень <span id="task-level-num">1</span></div>
+      <div class="task-desc" id="task-desc"></div>
+
+      <div class="editor-label">Твой CSS:</div>
+      <div class="editor-wrap">
+        <textarea id="css-input" spellcheck="false" placeholder="/* Пиши CSS здесь... */"></textarea>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-check" id="btn-check" onclick="checkSolution()">✅ Проверить</button>
+        <button class="btn btn-next"  id="btn-next"  onclick="nextLevel()">▶ Далее</button>
+        <button class="btn btn-hint"  id="btn-hint"  onclick="toggleHint()">💡 Подсказка</button>
+        <button class="btn btn-map"   onclick="goToMap()">🗺 Карта</button>
+      </div>
+
+      <div id="hint-box">💡 <span id="hint-text"></span></div>
+      <div id="feedback-box"></div>
+    </div>
+
+    <!-- Fixed HTML reference -->
+    <div class="panel-card" style="margin-top:16px;">
+      <h3>📄 HTML на странице (зафиксирован)</h3>
+      <div style="background:#0a0a2a;border:2px solid var(--border);padding:10px;font-size:10px;line-height:1.8;overflow-x:auto;">
+        <pre id="html-ref" style="color:var(--blue); white-space:pre-wrap;"></pre>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     UI LAYER — LEVEL COMPLETE OVERLAY
+     ============================================================ -->
+<div id="level-complete">
+  <div class="complete-card">
+    <div class="complete-title">🏆 УРОВЕНЬ ПРОЙДЕН!</div>
+    <div class="complete-stars" id="complete-stars">⭐⭐⭐</div>
+    <div class="complete-score">+<span id="pts-earned">100</span> очков</div>
+    <div class="btn-row" style="justify-content:center">
+      <button class="btn btn-next" style="display:block" onclick="nextLevel()">▶ Следующий уровень</button>
+      <button class="btn btn-map"  onclick="goToMap()">🗺 На карту</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     UI LAYER — GAME OVER OVERLAY
+     ============================================================ -->
+<div id="game-over">
+  <div class="game-over-card">
+    <div style="font-size:24px;color:var(--red);text-shadow:var(--shadow)">💀 GAME OVER</div>
+    <div style="margin:16px 0;font-size:12px;color:var(--text2)">Жизни закончились, но не сдавайся!</div>
+    <div class="btn-row" style="justify-content:center">
+      <button class="btn btn-check" onclick="restartGame()">🔄 Начать заново</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     UI LAYER — SHARE MODAL
+     ============================================================ -->
+<div id="share-modal">
+  <div class="share-card">
+    <h2>📤 ПОДЕЛИТЬСЯ ТРЕНАЖЁРОМ</h2>
+
+    <div style="font-size:11px;color:var(--text2);margin-bottom:10px">
+      Временная ссылка (работает в текущей сессии браузера):
+    </div>
+    <div class="share-url-box" id="share-url-box">Генерация ссылки...</div>
+    <button class="btn btn-share" style="margin-top:4px" onclick="copyShareUrl()">📋 Скопировать ссылку</button>
+
+    <div class="share-instructions">
+      <strong style="color:var(--accent)">📁 КАК СОХРАНИТЬ И ПОДЕЛИТЬСЯ ФАЙЛОМ:</strong>
+      <ol>
+        <li><span class="step-badge">1</span> Нажми <strong style="color:var(--blue)">«Скачать HTML»</strong> на карте</li>
+        <li><span class="step-badge">2</span> Сохрани файл как <code style="color:var(--accent)">index.html</code></li>
+        <li><span class="step-badge">3</span> Открой файл в любом браузере — работает офлайн</li>
+        <li><span class="step-badge">4</span> Залей на <strong style="color:var(--green)">GitHub Pages</strong> или <strong style="color:var(--green)">Netlify</strong> для постоянной ссылки</li>
+      </ol>
+      <div style="margin-top:12px;padding:8px;background:#0a0a2a;border:1px solid var(--border);font-size:10px;color:var(--text2)">
+        💡 GitHub Pages: создай репозиторий → загрузи index.html → Settings → Pages → Source: main
+      </div>
+    </div>
+
+    <button class="btn btn-map" style="margin-top:16px;width:100%" onclick="closeShareModal()">✖ Закрыть</button>
+  </div>
+</div>
+
+<div id="app-footer">CSS QUEST v1.0 — PIXEL TRAINER — РАБОТАЕТ ОФЛАЙН</div>
+
+<script>
+/* ============================================================
+   LEARNING ENGINE — Levels Data
+   ============================================================ */
+const LEVELS = [
+  /* ---- LEVEL 1: :hover ---- */
+  {
+    id: 1,
+    name: ':hover',
+    icon: '🖱️',
+    selector: 'theoryHover',
+    theory: `
+      <p><strong style="color:var(--accent)">:hover</strong> — псевдокласс, который применяется к элементу, когда пользователь наводит на него курсор мыши.</p>
+      <div class="example-box"><pre>/* Базовый синтаксис */
+селектор:hover {
+  свойство: значение;
+}</pre></div>
+      <p>Это один из самых часто используемых псевдоклассов для создания интерактивных эффектов:</p>
+      <div class="example-box"><pre>button:hover {
+  background-color: blue;
+  color: white;
+}</pre></div>
+      <p>Часто используется вместе с <code>transition</code> для плавного изменения стилей.</p>
+    `,
+    hint: 'Используй .box:hover { ... } и измени background-color',
+    html: `<div class="box">Наведи на меня!</div>`,
+    startCSS: `.box {
+  width: 150px;
+  height: 80px;
+  background-color: #cccccc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: monospace;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s;
+}`,
+    task: 'Сделай так, чтобы <code>.box</code> при наведении курсора менял <strong>background-color</strong> на <code>#ff4466</code> и <strong>color</strong> на <code>white</code>.',
+    validate(css, frame) {
+      /* getComputedStyle approach: simulate hover via JS in iframe */
+      const doc = frame.contentDocument;
+      if (!doc) return { ok: false, msg: 'Ошибка предпросмотра' };
+      const el = doc.querySelector('.box');
+      if (!el) return { ok: false, msg: 'Элемент .box не найден' };
+      // Check CSS text for :hover rule
+      const lc = css.toLowerCase().replace(/\s/g,'');
+      const hasHover = lc.includes('.box:hover');
+      const hasBg    = lc.includes('background-color:#ff4466') || lc.includes('background:#ff4466') || lc.includes('background-color:rgb(255,68,102)');
+      const hasColor = lc.includes('color:white') || lc.includes('color:#fff') || lc.includes('color:#ffffff') || lc.includes('color:rgb(255,255,255)');
+      if (hasHover && hasBg && hasColor) return { ok: true, pts: 100 };
+      if (hasHover && hasBg)  return { ok: false, msg: 'Хорошее начало! Не забудь добавить color: white' };
+      if (hasHover) return { ok: false, msg: 'Псевдокласс :hover есть! Теперь добавь нужные свойства' };
+      return { ok: false, msg: 'Используй .box:hover { } для применения стилей при наведении' };
+    }
+  },
+
+  /* ---- LEVEL 2: :active ---- */
+  {
+    id: 2,
+    name: ':active',
+    icon: '👆',
+    theory: `
+      <p><strong style="color:var(--accent)">:active</strong> — псевдокласс, который применяется в момент, когда пользователь <em>нажимает</em> на элемент (удерживает кнопку мыши).</p>
+      <div class="example-box"><pre>button:active {
+  transform: scale(0.95);
+  box-shadow: none;
+}</pre></div>
+      <p>Часто используется вместе с <code>:hover</code> для создания «эффекта нажатия»:</p>
+      <div class="example-box"><pre>.btn:hover  { background: #0080ff; }
+.btn:active { background: #0040aa;
+              transform: translateY(2px); }</pre></div>
+      <p>Порядок важен: <code>:link → :visited → :hover → :active</code> (LVHA)</p>
+    `,
+    hint: 'Добавь .button:active { transform: scale(0.9); background-color: #aa2244; }',
+    html: `<button class="button">Нажми на меня!</button>`,
+    startCSS: `.button {
+  padding: 14px 28px;
+  background-color: #ff4466;
+  color: white;
+  border: none;
+  font-family: monospace;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  box-shadow: 0 4px 0 #881133;
+  transition: all 0.1s;
+}`,
+    task: 'При нажатии на <code>.button</code> примени <strong>transform: scale(0.9)</strong> и измени <strong>background-color</strong> на <code>#aa2244</code>.',
+    validate(css) {
+      const lc = css.toLowerCase().replace(/\s/g,'');
+      const hasActive = lc.includes('.button:active');
+      const hasScale  = lc.includes('scale(0.9)');
+      const hasBg     = lc.includes('background-color:#aa2244') || lc.includes('background:#aa2244');
+      if (hasActive && hasScale && hasBg) return { ok: true, pts: 120 };
+      if (hasActive && hasScale) return { ok: false, msg: 'Отлично! Осталось добавить background-color: #aa2244' };
+      if (hasActive) return { ok: false, msg: 'Псевдокласс :active найден! Добавь transform: scale(0.9)' };
+      return { ok: false, msg: 'Используй .button:active { } для стилей в момент нажатия' };
+    }
+  },
+
+  /* ---- LEVEL 3: :focus ---- */
+  {
+    id: 3,
+    name: ':focus',
+    icon: '🎯',
+    theory: `
+      <p><strong style="color:var(--accent)">:focus</strong> — применяется к элементу, который получил <em>фокус</em> (кликнули или перешли по Tab).</p>
+      <div class="example-box"><pre>input:focus {
+  outline: 2px solid blue;
+  border-color: blue;
+}</pre></div>
+      <p>Особенно важен для форм и доступности (accessibility). Никогда не убирай <code>outline</code> без замены!</p>
+      <div class="example-box"><pre>/* ❌ Плохо — нарушает доступность */
+input:focus { outline: none; }
+
+/* ✅ Хорошо — заменяем на свой стиль */
+input:focus {
+  outline: none;
+  border: 2px solid #0080ff;
+  box-shadow: 0 0 8px rgba(0,128,255,0.5);
+}</pre></div>
+    `,
+    hint: 'Напиши .field:focus { outline: none; border: 3px solid #44aaff; box-shadow: 0 0 12px #44aaff; }',
+    html: `<label style="font-family:monospace;display:block;margin-bottom:8px">Имя:</label>
+<input class="field" type="text" placeholder="Кликни сюда...">`,
+    startCSS: `.field {
+  padding: 10px 14px;
+  border: 2px solid #999;
+  font-family: monospace;
+  font-size: 15px;
+  background: #f5f5f5;
+  width: 220px;
+  transition: all 0.2s;
+}`,
+    task: 'Когда поле <code>.field</code> получает фокус: убери стандартный <code>outline</code>, установи <code>border: 3px solid #44aaff</code> и добавь свечение через <code>box-shadow</code>.',
+    validate(css) {
+      const lc = css.toLowerCase().replace(/\s/g,'');
+      const hasFocus   = lc.includes('.field:focus');
+      const hasOutline = lc.includes('outline:none') || lc.includes('outline:0');
+      const hasBorder  = lc.includes('border:3px') || lc.includes('border-color:#44aaff') || lc.includes('#44aaff');
+      const hasShadow  = lc.includes('box-shadow');
+      if (hasFocus && hasOutline && hasBorder && hasShadow) return { ok: true, pts: 130 };
+      if (hasFocus && hasBorder && hasShadow) return { ok: false, msg: 'Почти! Добавь outline: none чтобы убрать стандартный контур' };
+      if (hasFocus && hasBorder) return { ok: false, msg: 'Хорошо! Добавь ещё box-shadow для свечения' };
+      if (hasFocus) return { ok: false, msg: ':focus найден! Добавь border: 3px solid #44aaff' };
+      return { ok: false, msg: 'Используй .field:focus { } для стилей при фокусе на элементе' };
+    }
+  },
+
+  /* ---- LEVEL 4: :nth-child() ---- */
+  {
+    id: 4,
+    name: ':nth-child',
+    icon: '🔢',
+    theory: `
+      <p><strong style="color:var(--accent)">:nth-child(n)</strong> — выбирает элемент, который является <em>n-м дочерним</em> элементом своего родителя.</p>
+      <div class="example-box"><pre>li:nth-child(2)    /* 2-й элемент */
+li:nth-child(odd)  /* нечётные: 1,3,5... */
+li:nth-child(even) /* чётные: 2,4,6... */
+li:nth-child(3n)   /* каждый 3-й: 3,6,9... */
+li:nth-child(3n+1) /* 1,4,7,10... */</pre></div>
+      <p>Мощный инструмент для стилизации таблиц (зебра) и списков:</p>
+      <div class="example-box"><pre>tr:nth-child(even) {
+  background-color: #f2f2f2;
+}</pre></div>
+    `,
+    hint: 'Используй li:nth-child(even) { background: #e8f4ff; } и li:nth-child(odd) { background: #fff; }',
+    html: `<ul class="list">
+  <li>Элемент 1</li>
+  <li>Элемент 2</li>
+  <li>Элемент 3</li>
+  <li>Элемент 4</li>
+  <li>Элемент 5</li>
+  <li>Элемент 6</li>
+</ul>`,
+    startCSS: `.list {
+  list-style: none;
+  padding: 0;
+  font-family: monospace;
+  font-size: 14px;
+  border: 2px solid #ddd;
+}
+.list li {
+  padding: 10px 14px;
+  border-bottom: 1px solid #ddd;
+}`,
+    task: 'Создай эффект «зебры»: чётные строки (<code>even</code>) — фон <code>#e8f4ff</code>, нечётные (<code>odd</code>) — фон <code>#ffffff</code>.',
+    validate(css) {
+      const lc = css.toLowerCase().replace(/\s/g,'');
+      const hasEven = lc.includes('nth-child(even)') || lc.includes('nth-child(2n)');
+      const hasOdd  = lc.includes('nth-child(odd)')  || lc.includes('nth-child(2n+1)') || lc.includes('nth-child(2n-1)');
+      const hasBgEven = lc.includes('#e8f4ff') || lc.includes('rgb(232,244,255)');
+      const hasBgOdd  = lc.includes('#ffffff') || lc.includes('#fff') || lc.includes('white');
+      if ((hasEven || hasOdd) && hasBgEven) return { ok: true, pts: 150 };
+      if (hasEven || hasOdd) return { ok: false, msg: ':nth-child найден! Добавь background-color: #e8f4ff для чётных' };
+      return { ok: false, msg: 'Используй li:nth-child(even) и li:nth-child(odd)' };
+    }
+  },
+
+  /* ---- LEVEL 5: :first-child / :last-child ---- */
+  {
+    id: 5,
+    name: ':first/:last',
+    icon: '🥇',
+    theory: `
+      <p><strong style="color:var(--accent)">:first-child</strong> — первый дочерний элемент своего родителя.</p>
+      <p><strong style="color:var(--accent)">:last-child</strong> — последний дочерний элемент своего родителя.</p>
+      <div class="example-box"><pre>p:first-child { font-weight: bold; }
+p:last-child  { margin-bottom: 0; }
+
+/* Убрать лишние рамки в списке */
+li:first-child { border-top: none; }
+li:last-child  { border-bottom: none; }</pre></div>
+      <p>Частый паттерн — убирать отступы/рамки у крайних элементов:</p>
+      <div class="example-box"><pre>.menu-item:last-child {
+  border-right: none;
+}</pre></div>
+    `,
+    hint: '.card:first-child { background: #ffd700; border: 3px solid #ff8800; }  .card:last-child { background: #c0c0c0; }',
+    html: `<div class="cards">
+  <div class="card">🥇 Первый</div>
+  <div class="card">Второй</div>
+  <div class="card">Третий</div>
+  <div class="card">🥉 Последний</div>
+</div>`,
+    startCSS: `.cards {
+  display: flex;
+  gap: 8px;
+  font-family: monospace;
+  font-size: 13px;
+}
+.card {
+  padding: 14px 10px;
+  background: #eeeeee;
+  border: 2px solid #cccccc;
+  text-align: center;
+  flex: 1;
+  font-weight: bold;
+}`,
+    task: 'Выдели первую карточку: <code>background: #ffd700; border: 3px solid #ff8800;</code>.<br>Последнюю карточку: <code>background: #c0c0c0;</code>.',
+    validate(css) {
+      const lc = css.toLowerCase().replace(/\s/g,'');
+      const hasFirst  = lc.includes(':first-child');
+      const hasLast   = lc.includes(':last-child');
+      const hasGold   = lc.includes('#ffd700') || lc.includes('gold') || lc.includes('rgb(255,215,0)');
+      const hasSilver = lc.includes('#c0c0c0') || lc.includes('silver') || lc.includes('rgb(192,192,192)');
+      if (hasFirst && hasLast && hasGold && hasSilver) return { ok: true, pts: 140 };
+      if (hasFirst && hasLast) return { ok: false, msg: 'Оба псевдокласса есть! Добавь правильные цвета' };
+      if (hasFirst && hasGold) return { ok: false, msg: 'Первый элемент готов! Добавь :last-child { background: #c0c0c0 }' };
+      if (hasFirst) return { ok: false, msg: ':first-child найден! Добавь :last-child для последнего' };
+      return { ok: false, msg: 'Используй .card:first-child и .card:last-child' };
+    }
+  },
+
+  /* ---- LEVEL 6: :checked ---- */
+  {
+    id: 6,
+    name: ':checked',
+    icon: '☑️',
+    theory: `
+      <p><strong style="color:var(--accent)">:checked</strong> — применяется к элементам <code>checkbox</code>, <code>radio</code> или <code>option</code>, которые <em>отмечены/выбраны</em>.</p>
+      <div class="example-box"><pre>input:checked {
+  accent-color: green;
+}
+
+/* Стилизация label через соседний checked */
+input:checked + label {
+  color: green;
+  font-weight: bold;
+}</pre></div>
+      <p>Мощный трюк: <code>+</code> (соседний селектор) — стилизуй <code>label</code> в зависимости от состояния <code>checkbox</code>!</p>
+      <div class="example-box"><pre>/* Кастомный чекбокс без JS */
+input[type="checkbox"]:checked + .custom {
+  background: #00cc66;
+  border-color: #009944;
+}</pre></div>
+    `,
+    hint: 'input:checked + label { color: #00cc66; font-weight: bold; text-decoration: line-through; }',
+    html: `<div class="todo">
+  <div class="todo-item">
+    <input type="checkbox" id="t1">
+    <label for="t1">Изучить :hover</label>
+  </div>
+  <div class="todo-item">
+    <input type="checkbox" id="t2">
+    <label for="t2">Понять :focus</label>
+  </div>
+  <div class="todo-item">
+    <input type="checkbox" id="t3" checked>
+    <label for="t3">Освоить :nth-child</label>
+  </div>
+</div>`,
+    startCSS: `.todo { font-family: monospace; font-size: 15px; }
+.todo-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid #eee;
+}
+input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; }
+label { cursor: pointer; }`,
+    task: 'Когда <code>checkbox</code> отмечен, его соседний <code>label</code> должен стать <code>color: #00cc66</code>, <code>font-weight: bold</code> и получить <code>text-decoration: line-through</code>.',
+    validate(css) {
+      const lc = css.toLowerCase().replace(/\s/g,'');
+      const hasChecked    = lc.includes(':checked');
+      const hasSibling    = lc.includes(':checked+label') || lc.includes(':checked +label') || lc.includes(':checked+ label');
+      const hasColor      = lc.includes('#00cc66') || lc.includes('rgb(0,204,102)');
+      const hasBold       = lc.includes('font-weight:bold') || lc.includes('font-weight:700');
+      const hasStrike     = lc.includes('line-through');
+      if (hasSibling && hasColor && hasBold && hasStrike) return { ok: true, pts: 160 };
+      if (hasSibling && hasColor) return { ok: false, msg: 'Отлично! Добавь font-weight: bold и text-decoration: line-through' };
+      if (hasChecked && hasSibling) return { ok: false, msg: 'Комбинатор + работает! Добавь color: #00cc66' };
+      if (hasChecked) return { ok: false, msg: ':checked найден! Используй "input:checked + label" для соседнего label' };
+      return { ok: false, msg: 'Используй input:checked + label { } для стилизации label при отмеченном checkbox' };
+    }
+  }
+];
+
+/* ============================================================
+   GAME LOGIC — State
+   ============================================================ */
+const STATE = {
+  currentLevel: 0,   // index in LEVELS array
+  score: 0,
+  lives: 3,
+  completed: [],     // array of level indices completed
+  stars: {},         // { levelIdx: numStars }
+  hintUsed: false,
+  attempts: 0,
+};
+
+/* ============================================================
+   GAME LOGIC — Init
+   ============================================================ */
+function init() {
+  renderMap();
+  updateHeader();
+}
+
+function renderMap() {
+  const grid = document.getElementById('map-nodes');
+  const done = STATE.completed.length;
+  document.getElementById('prog-text').textContent = done + '/6';
+  document.getElementById('prog-fill').style.width = (done / 6 * 100) + '%';
+
+  grid.innerHTML = '';
+  LEVELS.forEach((lvl, i) => {
+    const isCompleted = STATE.completed.includes(i);
+    const isCurrent   = i === STATE.currentLevel;
+    const isLocked    = i > STATE.currentLevel;
+
+    const node = document.createElement('div');
+    node.className = 'map-node' +
+      (isCompleted ? ' completed' : '') +
+      (isCurrent   ? ' current'   : '') +
+      (isLocked    ? ' locked'    : '');
+
+    const stars = STATE.stars[i] || 0;
+    const starStr = '⭐'.repeat(stars) + '☆'.repeat(3 - stars);
+
+    node.innerHTML = `
+      <div class="node-icon">${lvl.icon}</div>
+      <div class="node-name">${lvl.name}</div>
+      <div class="node-stars">${starStr}</div>
+    `;
+    node.onclick = () => startLevel(i);
+    grid.appendChild(node);
+  });
+}
+
+function updateHeader() {
+  document.getElementById('score-val').textContent = STATE.score;
+  document.getElementById('level-num').textContent  = STATE.currentLevel + 1;
+
+  for (let i = 1; i <= 3; i++) {
+    const h = document.getElementById('h' + i);
+    h.classList.toggle('lost', i > STATE.lives);
+  }
+}
+
+/* ============================================================
+   GAME LOGIC — Level Navigation
+   ============================================================ */
+function startLevel(idx) {
+  STATE.currentLevel = idx;
+  STATE.hintUsed     = false;
+  STATE.attempts     = 0;
+
+  const lvl = LEVELS[idx];
+
+  document.getElementById('task-level-num').textContent = idx + 1;
+  document.getElementById('theory-selector').textContent = lvl.name;
+  document.getElementById('theory-body').innerHTML = lvl.theory;
+  document.getElementById('task-desc').innerHTML   = lvl.task;
+  document.getElementById('html-ref').textContent  = lvl.html;
+  document.getElementById('hint-text').textContent = lvl.hint;
+
+  // Reset UI
+  document.getElementById('css-input').value = lvl.startCSS || '';
+  document.getElementById('hint-box').classList.remove('visible');
+  document.getElementById('feedback-box').classList.remove('visible', 'success', 'error');
+  document.getElementById('btn-next').style.display = 'none';
+
+  updatePreview();
+  showScreen('lesson-screen');
+  updateHeader();
+}
+
+function nextLevel() {
+  document.getElementById('level-complete').classList.remove('visible');
+  const next = STATE.currentLevel + 1;
+  if (next < LEVELS.length) {
+    startLevel(next);
+  } else {
+    // All levels done
+    showFinalScreen();
+  }
+}
+
+function goToMap() {
+  document.getElementById('level-complete').classList.remove('visible');
+  renderMap();
+  showScreen('map-screen');
+}
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function restartGame() {
+  STATE.score     = 0;
+  STATE.lives     = 3;
+  STATE.completed = [];
+  STATE.stars     = {};
+  STATE.currentLevel = 0;
+  document.getElementById('game-over').classList.remove('visible');
+  renderMap();
+  showScreen('map-screen');
+  updateHeader();
+}
+
+function showFinalScreen() {
+  // reuse level complete with special message
+  document.getElementById('complete-stars').textContent = '🏆🎉🏆';
+  document.getElementById('pts-earned').textContent = STATE.score;
+  document.getElementById('level-complete').classList.add('visible');
+  document.getElementById('complete-title') && (document.querySelector('.complete-title').textContent = '🎮 ВСЕ УРОВНИ ПРОЙДЕНЫ!');
+}
+
+/* ============================================================
+   VALIDATION ENGINE
+   ============================================================ */
+function checkSolution() {
+  const css  = document.getElementById('css-input').value;
+  const lvl  = LEVELS[STATE.currentLevel];
+  const frame = document.getElementById('preview-frame');
+
+  STATE.attempts++;
+
+  // Update preview first
+  updatePreview();
+
+  // Slight delay to let iframe render
+  setTimeout(() => {
+    const result = lvl.validate(css, frame);
+    showFeedback(result);
+
+    if (result.ok) {
+      onLevelSuccess(result.pts || 100);
+    } else {
+      onWrongAnswer();
+    }
+  }, 200);
+}
+
+function onLevelSuccess(pts) {
+  // Stars: 3 if first try, 2 if 2 tries, 1 otherwise
+  const stars = STATE.attempts === 1 ? 3 : STATE.attempts === 2 ? 2 : 1;
+  STATE.stars[STATE.currentLevel] = stars;
+
+  // Bonus for no hint
+  const bonus = STATE.hintUsed ? 0 : 20;
+  const total = pts + bonus;
+  STATE.score += total;
+
+  if (!STATE.completed.includes(STATE.currentLevel)) {
+    STATE.completed.push(STATE.currentLevel);
+    // Unlock next
+    if (STATE.currentLevel + 1 < LEVELS.length) {
+      STATE.currentLevel = STATE.currentLevel + 1;
+    }
+  }
+
+  // Coin FX
+  spawnCoin();
+
+  // Show overlay
+  document.getElementById('complete-stars').textContent = '⭐'.repeat(stars) + '☆'.repeat(3 - stars);
+  document.getElementById('pts-earned').textContent = total;
+  document.querySelector('.complete-title').textContent = '🏆 УРОВЕНЬ ПРОЙДЕН!';
+  document.getElementById('level-complete').classList.add('visible');
+
+  document.getElementById('btn-next').style.display = 'inline-block';
+  updateHeader();
+  renderMap();
+}
+
+function onWrongAnswer() {
+  if (STATE.attempts >= 3) {
+    STATE.lives--;
+    STATE.attempts = 0;
+    updateHeader();
+    if (STATE.lives <= 0) {
+      setTimeout(() => {
+        document.getElementById('game-over').classList.add('visible');
+      }, 800);
+    }
+  }
+}
+
+function showFeedback(result) {
+  const box = document.getElementById('feedback-box');
+  box.classList.remove('success', 'error');
+  box.classList.add('visible');
+  if (result.ok) {
+    box.classList.add('success');
+    box.textContent = '✅ Правильно! Отличная работа!';
+  } else {
+    box.classList.add('error');
+    box.textContent = '❌ ' + (result.msg || 'Попробуй ещё раз');
+  }
+}
+
+/* ============================================================
+   LEARNING ENGINE — Preview
+   ============================================================ */
+function updatePreview() {
+  const css  = document.getElementById('css-input').value;
+  const lvl  = LEVELS[STATE.currentLevel];
+  if (!lvl) return;
+
+  const frame = document.getElementById('preview-frame');
+  const doc   = frame.contentDocument || frame.contentWindow.document;
+  doc.open();
+  doc.write(`<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+body { margin: 16px; font-family: 'Courier New', monospace; background: #fff; color: #111; }
+${css}
+</style>
+</head>
+<body>
+${lvl.html}
+</body>
+</html>`);
+  doc.close();
+
+  // Auto-resize iframe
+  setTimeout(() => {
+    try {
+      const h = doc.body.scrollHeight;
+      frame.style.height = Math.max(130, h + 16) + 'px';
+    } catch(e) {}
+  }, 100);
+}
+
+/* ============================================================
+   UI LAYER — Hint
+   ============================================================ */
+function toggleHint() {
+  const box = document.getElementById('hint-box');
+  box.classList.toggle('visible');
+  STATE.hintUsed = true;
+}
+
+/* ============================================================
+   UI LAYER — Live preview on input
+   ============================================================ */
+document.getElementById('css-input').addEventListener('input', debounce(updatePreview, 400));
+
+function debounce(fn, delay) {
+  let timer;
+  return function(...args) {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn.apply(this, args), delay);
+  };
+}
+
+/* ============================================================
+   UI LAYER — Coin FX
+   ============================================================ */
+function spawnCoin() {
+  const coin = document.createElement('div');
+  coin.className = 'coin-fx';
+  coin.textContent = '🪙';
+  // Random horizontal position
+  coin.style.left = (20 + Math.random() * 60) + 'vw';
+  coin.style.top  = '40vh';
+  document.body.appendChild(coin);
+  setTimeout(() => coin.remove(), 900);
+}
+
+/* ============================================================
+   SHARE + DOWNLOAD
+   ============================================================ */
+let _shareUrl = '';
+
+function openShareModal() {
+  const modal = document.getElementById('share-modal');
+  modal.classList.add('visible');
+
+  // Generate blob URL from current document HTML
+  try {
+    const html  = document.documentElement.outerHTML;
+    const blob  = new Blob([html], { type: 'text/html' });
+    _shareUrl   = URL.createObjectURL(blob);
+    document.getElementById('share-url-box').textContent = _shareUrl;
+  } catch(e) {
+    document.getElementById('share-url-box').textContent = 'Ошибка генерации ссылки: ' + e.message;
+  }
+}
+
+function closeShareModal() {
+  document.getElementById('share-modal').classList.remove('visible');
+}
+
+function copyShareUrl() {
+  if (!_shareUrl) return;
+  navigator.clipboard.writeText(_shareUrl)
+    .then(() => {
+      const btn = event.target;
+      const orig = btn.textContent;
+      btn.textContent = '✅ Скопировано!';
+      setTimeout(() => btn.textContent = orig, 2000);
+    })
+    .catch(() => {
+      // Fallback
+      const ta = document.createElement('textarea');
+      ta.value = _shareUrl;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      ta.remove();
+    });
+}
+
+function downloadHTML() {
+  try {
+    const html = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+    const blob = new Blob([html], { type: 'text/html' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = 'css-quest-trainer.html';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 3000);
+  } catch(e) {
+    alert('Ошибка скачивания: ' + e.message);
+  }
+}
+
+/* ============================================================
+   BOOT
+   ============================================================ */
+init();
+</script>
+</body>
+</html>
